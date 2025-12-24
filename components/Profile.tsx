@@ -1,18 +1,26 @@
 
 import React, { useState } from 'react';
 import { UserProfile, UserFile, Payment } from '../types';
-// Fixed missing 'Clock' import
-import { Camera, Mail, Shield, Plus, FileText, Download, Trash2, Settings, Target, BarChart3, UploadCloud, Clock } from 'lucide-react';
+import { Camera, Mail, Shield, Plus, FileText, Download, Trash2, Settings, Target, BarChart3, UploadCloud, Clock, Landmark, X, CreditCard } from 'lucide-react';
 
 interface ProfileProps {
   profile: UserProfile;
   setProfile: React.Dispatch<React.SetStateAction<UserProfile>>;
   onFileUpload: (file: File) => void;
   payments: Payment[];
+  onAddPayment: (payment: Omit<Payment, 'id'>) => void;
 }
 
-const Profile: React.FC<ProfileProps> = ({ profile, setProfile, onFileUpload, payments }) => {
+const Profile: React.FC<ProfileProps> = ({ profile, setProfile, onFileUpload, payments, onAddPayment }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'docs' | 'goals'>('info');
+  const [isAddingPayment, setIsAddingPayment] = useState(false);
+  const [newPayment, setNewPayment] = useState<Omit<Payment, 'id'>>({
+    concept: '',
+    amount: 0,
+    date: new Date().toISOString().split('T')[0],
+    status: 'completado',
+    category: 'Vivienda'
+  });
 
   const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
@@ -27,101 +35,120 @@ const Profile: React.FC<ProfileProps> = ({ profile, setProfile, onFileUpload, pa
     }
   };
 
-  const progress = Math.min(100, (payments.reduce((acc, p) => acc + (p.status === 'completado' ? p.amount : 0), 0) / profile.personalPaymentGoal) * 100);
+  const handlePaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPayment.concept && newPayment.amount > 0) {
+      onAddPayment(newPayment);
+      setNewPayment({
+        concept: '',
+        amount: 0,
+        date: new Date().toISOString().split('T')[0],
+        status: 'completado',
+        category: 'Vivienda'
+      });
+      setIsAddingPayment(false);
+    }
+  };
+
+  const totalExecuted = payments.reduce((acc, p) => acc + (p.status === 'completado' ? p.amount : 0), 0);
+  const progress = Math.min(100, (totalExecuted / profile.personalPaymentGoal) * 100);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fadeIn">
-      {/* Profile Banner/Header */}
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="h-32 bg-gradient-to-r from-indigo-500 to-purple-600 relative">
-          <button className="absolute bottom-4 right-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-lg transition-colors backdrop-blur-md">
-            <Camera size={20} />
+    <div className="max-w-5xl mx-auto space-y-10 animate-fadeIn">
+      {/* Dynamic Profile Header */}
+      <div className="bg-white rounded-[3rem] border-4 border-slate-100 overflow-hidden shadow-2xl relative">
+        <div className="h-40 bg-slate-900 relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-600/20 to-transparent"></div>
+          <button className="absolute bottom-6 right-8 bg-white/10 hover:bg-white/20 text-white p-3 rounded-2xl transition-colors backdrop-blur-xl border border-white/20">
+            <Settings size={20} />
           </button>
         </div>
-        <div className="px-8 pb-8 flex flex-col items-center -mt-16 sm:flex-row sm:items-end sm:gap-6 sm:-mt-12">
-          <div className="relative">
+        <div className="px-12 pb-10 flex flex-col items-center -mt-20 sm:flex-row sm:items-end sm:gap-10 sm:-mt-16 relative z-10">
+          <div className="relative group">
             <img 
               src={profile.avatar} 
               alt="Avatar" 
-              className="w-32 h-32 rounded-3xl border-4 border-white shadow-xl bg-white object-cover" 
+              className="w-40 h-40 rounded-[2.5rem] border-[6px] border-white shadow-2xl bg-slate-50 object-cover transform group-hover:scale-[1.02] transition-transform" 
             />
-            <label className="absolute bottom-2 right-2 p-2 bg-indigo-600 rounded-xl text-white shadow-lg cursor-pointer hover:bg-indigo-700 transition-colors">
-              <Camera size={16} />
+            <label className="absolute bottom-4 right-4 p-3 bg-indigo-600 text-white rounded-2xl shadow-xl cursor-pointer hover:bg-indigo-700 transition-all hover:scale-110">
+              <Camera size={18} />
               <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
             </label>
           </div>
-          <div className="mt-4 sm:mt-0 flex-1 text-center sm:text-left">
-            <h1 className="text-3xl font-bold text-slate-900">{profile.name}</h1>
-            <p className="text-slate-500 font-medium">{profile.role}</p>
+          <div className="mt-6 sm:mt-0 flex-1 text-center sm:text-left">
+            <h1 className="text-4xl font-black text-slate-900 tracking-tight">{profile.name}</h1>
+            <p className="text-indigo-600 font-black uppercase tracking-widest text-[10px] bg-indigo-50 px-3 py-1 rounded-full w-fit mt-2 mx-auto sm:mx-0">{profile.role}</p>
           </div>
-          <div className="mt-6 sm:mt-0 flex gap-2">
-            <button className="px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-all flex items-center gap-2">
-              <Settings size={18} />
-              Editar Perfil
-            </button>
+          <div className="mt-8 sm:mt-0 flex gap-4">
+             <div className="text-center p-4 bg-slate-50 rounded-3xl border border-slate-100 min-w-[120px]">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Archivos</p>
+                <p className="text-xl font-black text-slate-900">{profile.files.length}</p>
+             </div>
+             <div className="text-center p-4 bg-slate-50 rounded-3xl border border-slate-100 min-w-[120px]">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Pagos Reg.</p>
+                <p className="text-xl font-black text-slate-900">{payments.length}</p>
+             </div>
           </div>
         </div>
 
-        {/* Profile Tabs */}
-        <div className="border-t border-slate-100 px-8">
-          <div className="flex gap-8">
-            <button 
-              onClick={() => setActiveTab('info')}
-              className={`py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'info' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-            >
-              Información General
-            </button>
-            <button 
-              onClick={() => setActiveTab('docs')}
-              className={`py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'docs' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-            >
-              Documentos & Archivos
-            </button>
-            <button 
-              onClick={() => setActiveTab('goals')}
-              className={`py-4 text-sm font-bold border-b-2 transition-colors ${activeTab === 'goals' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-            >
-              Control de Pagos
-            </button>
+        <div className="border-t-2 border-slate-100 px-12 bg-slate-50/20">
+          <div className="flex gap-10">
+            {['info', 'docs', 'goals'].map((t) => (
+              <button 
+                key={t}
+                onClick={() => setActiveTab(t as any)}
+                className={`py-6 text-[10px] font-black uppercase tracking-widest border-b-4 transition-all ${activeTab === t ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+              >
+                {t === 'info' ? 'Account Details' : t === 'docs' ? 'Document Vault' : 'Financial Control'}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      {/* Tab Content */}
-      <div className="min-h-[400px]">
+      <div className="min-h-[500px]">
         {activeTab === 'info' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
-              <h3 className="font-bold text-lg text-slate-800 mb-2">Datos de Contacto</h3>
-              <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl">
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm">
-                  <Mail size={20} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div className="bg-white p-10 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-8">
+              <h3 className="font-black text-xl text-slate-900 uppercase tracking-tight flex items-center gap-3">
+                 <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+                 Direct Info
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-5 p-5 bg-slate-50 rounded-3xl border border-slate-100 group hover:bg-white hover:border-indigo-200 transition-all">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 shadow-sm group-hover:text-indigo-600 group-hover:rotate-6 transition-all">
+                    <Mail size={24} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Business Email</p>
+                    <p className="text-slate-800 font-bold">{profile.email}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Correo Electrónico</p>
-                  <p className="text-slate-700 font-medium">{profile.email}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 p-4 bg-slate-50 rounded-2xl">
-                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-slate-400 shadow-sm">
-                  <Shield size={20} />
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">Rol de Acceso</p>
-                  <p className="text-slate-700 font-medium">{profile.role}</p>
+                <div className="flex items-center gap-5 p-5 bg-slate-50 rounded-3xl border border-slate-100 group hover:bg-white hover:border-indigo-200 transition-all">
+                  <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-slate-400 shadow-sm group-hover:text-indigo-600 group-hover:rotate-6 transition-all">
+                    <Shield size={24} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Access Level</p>
+                    <p className="text-slate-800 font-bold">{profile.role}</p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-              <h3 className="font-bold text-lg text-slate-800 mb-6">Seguridad</h3>
-              <div className="space-y-4">
-                <p className="text-sm text-slate-500">Mantén tu cuenta segura habilitando la autenticación de dos pasos o cambiando tu contraseña periódicamente.</p>
-                <button className="w-full py-3 border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors">
-                  Cambiar Contraseña
+            <div className="bg-slate-900 p-10 rounded-[2.5rem] text-white shadow-2xl relative overflow-hidden">
+               <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/20 blur-[60px] rounded-full"></div>
+              <h3 className="font-black text-xl uppercase tracking-tight mb-6 flex items-center gap-3">
+                 <div className="w-1.5 h-6 bg-white rounded-full"></div>
+                 Security Hub
+              </h3>
+              <div className="space-y-5">
+                <p className="text-sm text-slate-400 font-medium">Protect your administrative credentials. Last security audit: Yesterday.</p>
+                <button className="w-full py-4 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl text-white font-black text-xs uppercase tracking-widest transition-all">
+                  Update Password
                 </button>
-                <button className="w-full py-3 bg-indigo-50 text-indigo-700 rounded-xl font-semibold hover:bg-indigo-100 transition-colors">
-                  Configurar 2FA
+                <button className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 rounded-2xl text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-600/30 transition-all">
+                  Enable 2FA Auth
                 </button>
               </div>
             </div>
@@ -129,49 +156,47 @@ const Profile: React.FC<ProfileProps> = ({ profile, setProfile, onFileUpload, pa
         )}
 
         {activeTab === 'docs' && (
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+          <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl overflow-hidden">
+            <div className="p-10 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
               <div>
-                <h3 className="font-bold text-lg text-slate-800">Repositorio de Documentos</h3>
-                <p className="text-sm text-slate-500">Sube comprobantes, identificaciones o contratos.</p>
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Personal Digital Vault</h3>
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Encrypted storage for sensitive documentation</p>
               </div>
-              <label className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold cursor-pointer hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all">
+              <label className="flex items-center gap-3 px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest cursor-pointer hover:bg-black shadow-xl transition-all">
                 <Plus size={18} />
-                Subir Archivo
+                Upload New File
                 <input type="file" className="hidden" onChange={handleFileSelect} />
               </label>
             </div>
             
-            <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="p-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {profile.files.length === 0 ? (
-                <div className="col-span-full py-20 flex flex-col items-center text-slate-400">
-                  <UploadCloud size={48} className="mb-4 opacity-20" />
-                  <p>No hay archivos cargados aún.</p>
+                <div className="col-span-full py-32 flex flex-col items-center text-slate-300">
+                  <UploadCloud size={64} className="mb-6 opacity-10" />
+                  <p className="font-black uppercase tracking-widest text-[10px]">Your repository is empty</p>
                 </div>
               ) : (
                 profile.files.map((file) => (
-                  <div key={file.id} className="p-4 border border-slate-100 rounded-2xl hover:border-indigo-100 hover:bg-indigo-50/30 transition-all group">
+                  <div key={file.id} className="p-6 bg-slate-50 border-2 border-slate-100 rounded-[2rem] hover:bg-white hover:border-indigo-100 hover:shadow-2xl transition-all group">
                     <div className="flex items-start justify-between">
-                      <div className="p-3 bg-white rounded-xl border border-slate-100 shadow-sm group-hover:shadow-md transition-shadow">
-                        <FileText className="text-indigo-600" size={24} />
+                      <div className="p-4 bg-white rounded-2xl border border-slate-100 shadow-sm group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                        <FileText size={24} />
                       </div>
-                      <div className="flex gap-1">
-                        <button className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors">
-                          <Download size={16} />
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button className="p-2 bg-white text-slate-400 hover:text-indigo-600 rounded-xl shadow-sm border border-slate-100 transition-all">
+                          <Download size={18} />
                         </button>
-                        <button className="p-1.5 text-slate-400 hover:text-red-600 transition-colors">
-                          <Trash2 size={16} />
+                        <button className="p-2 bg-white text-slate-400 hover:text-rose-600 rounded-xl shadow-sm border border-slate-100 transition-all">
+                          <Trash2 size={18} />
                         </button>
                       </div>
                     </div>
-                    <div className="mt-4">
-                      <p className="font-bold text-slate-800 truncate" title={file.name}>{file.name}</p>
-                      <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                        <span>{file.type}</span>
-                        <span>•</span>
+                    <div className="mt-6">
+                      <p className="font-black text-slate-900 truncate text-sm mb-1">{file.name}</p>
+                      <div className="flex items-center gap-3 text-[9px] text-slate-400 font-black uppercase tracking-widest">
+                        <span className="bg-white px-2 py-0.5 rounded border border-slate-100 shadow-sm">{file.type}</span>
                         <span>{file.size}</span>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-2">Subido el {file.uploadDate}</p>
                     </div>
                   </div>
                 ))
@@ -181,63 +206,149 @@ const Profile: React.FC<ProfileProps> = ({ profile, setProfile, onFileUpload, pa
         )}
 
         {activeTab === 'goals' && (
-          <div className="space-y-8">
-            <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-              <div className="flex items-center justify-between mb-8">
+          <div className="space-y-10">
+            <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-xl">
+              <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
                 <div>
-                  <h3 className="font-bold text-lg text-slate-800">Control Personal de Pagos</h3>
-                  <p className="text-sm text-slate-500">Seguimiento de tu meta de ahorro o gasto mensual.</p>
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight">Personal Ledger Control</h3>
+                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">Monthly collection goal & budget execution</p>
                 </div>
-                <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
-                  <Target size={24} />
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => setIsAddingPayment(true)}
+                    className="flex items-center gap-3 px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-200 hover:bg-indigo-700 transition-all"
+                  >
+                    <CreditCard size={18} />
+                    Log Transaction
+                  </button>
                 </div>
               </div>
 
-              <div className="space-y-6">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-bold text-slate-700">Progreso de Meta: ${profile.personalPaymentGoal}</span>
-                    <span className="text-sm font-bold text-indigo-600">{progress.toFixed(1)}%</span>
+              {isAddingPayment && (
+                <div className="mb-10 p-8 bg-indigo-50/50 border-2 border-indigo-100 rounded-[2rem] animate-slideDown shadow-inner">
+                  <div className="flex justify-between items-center mb-6">
+                    <h4 className="font-black text-indigo-900 uppercase text-xs tracking-widest">Transaction Entry</h4>
+                    <button onClick={() => setIsAddingPayment(false)} className="p-2 text-indigo-400 hover:text-indigo-600"><X size={24}/></button>
                   </div>
-                  <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
+                  <form onSubmit={handlePaymentSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="space-y-1">
+                       <label className="text-[9px] font-black uppercase text-indigo-400 ml-1">Concept</label>
+                       <input 
+                        className="w-full px-5 py-3 bg-white border border-indigo-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                        placeholder="Ej. Office Rent"
+                        value={newPayment.concept}
+                        onChange={e => setNewPayment({...newPayment, concept: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[9px] font-black uppercase text-indigo-400 ml-1">Amount ($)</label>
+                       <input 
+                        type="number"
+                        className="w-full px-5 py-3 bg-white border border-indigo-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                        placeholder="0.00"
+                        value={newPayment.amount || ''}
+                        onChange={e => setNewPayment({...newPayment, amount: parseFloat(e.target.value)})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1">
+                       <label className="text-[9px] font-black uppercase text-indigo-400 ml-1">Category</label>
+                       <select 
+                        className="w-full px-5 py-3 bg-white border border-indigo-100 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-bold"
+                        value={newPayment.category}
+                        onChange={e => setNewPayment({...newPayment, category: e.target.value})}
+                      >
+                        <option>Vivienda</option>
+                        <option>Servicios</option>
+                        <option>Inversión</option>
+                        <option>Gasto Op.</option>
+                      </select>
+                    </div>
+                    <button className="mt-5 bg-indigo-600 text-white font-black text-xs uppercase tracking-widest rounded-xl py-3 shadow-lg hover:bg-indigo-700 transition-all">Submit Entry</button>
+                  </form>
+                </div>
+              )}
+
+              <div className="space-y-10">
+                <div className="p-8 bg-slate-50 border border-slate-100 rounded-[2.5rem]">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Budget Execution Progress</span>
+                    <span className={`text-sm font-black ${progress > 90 ? 'text-rose-600' : 'text-indigo-600'}`}>{progress.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-6 bg-white rounded-full overflow-hidden border-2 border-slate-100 p-1">
                     <div 
-                      className="h-full bg-indigo-600 transition-all duration-1000 ease-out rounded-full shadow-inner shadow-indigo-400/20"
+                      className={`h-full transition-all duration-1000 ease-out rounded-full shadow-lg ${progress > 90 ? 'bg-rose-500' : 'bg-indigo-600'}`}
                       style={{ width: `${progress}%` }}
                     />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-emerald-50 rounded-2xl border border-emerald-100">
-                    <div className="flex items-center gap-2 text-emerald-700 mb-1">
-                      <BarChart3 size={16} />
-                      <span className="text-xs font-bold uppercase">Ejecutado</span>
-                    </div>
-                    <p className="text-2xl font-bold text-emerald-800">
-                      ${payments.reduce((acc, p) => acc + (p.status === 'completado' ? p.amount : 0), 0).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-                    <div className="flex items-center gap-2 text-slate-500 mb-1">
-                      <Clock size={16} />
-                      <span className="text-xs font-bold uppercase">Por Pagar</span>
-                    </div>
-                    <p className="text-2xl font-bold text-slate-800">
-                      ${payments.reduce((acc, p) => acc + (p.status !== 'completado' ? p.amount : 0), 0).toLocaleString()}
-                    </p>
+                  <div className="flex justify-between mt-4 text-[9px] font-black text-slate-400 uppercase tracking-tighter">
+                    <span className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-600"></div> Total Logged: ${totalExecuted.toLocaleString()}</span>
+                    <span className="flex items-center gap-2">Target Cap: ${profile.personalPaymentGoal.toLocaleString()} <button onClick={() => {
+                          const newGoal = prompt("Introduce tu nueva meta mensual:", profile.personalPaymentGoal.toString());
+                          if(newGoal) setProfile({...profile, personalPaymentGoal: parseInt(newGoal)});
+                      }} className="text-indigo-600 hover:underline">Edit</button></span>
                   </div>
                 </div>
 
-                <div className="pt-4">
-                    <button 
-                        onClick={() => {
-                            const newGoal = prompt("Introduce tu nueva meta mensual de pagos:", profile.personalPaymentGoal.toString());
-                            if(newGoal) setProfile({...profile, personalPaymentGoal: parseInt(newGoal)});
-                        }}
-                        className="text-sm text-indigo-600 font-bold hover:underline"
-                    >
-                        Configurar meta mensual
-                    </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <div className="p-8 bg-emerald-50 rounded-[2rem] border border-emerald-100 flex items-center justify-between group hover:bg-emerald-100/50 transition-all">
+                    <div>
+                      <div className="flex items-center gap-2 text-emerald-600 mb-2">
+                        <BarChart3 size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Net Outflow</span>
+                      </div>
+                      <p className="text-3xl font-black text-slate-900">${totalExecuted.toLocaleString()}</p>
+                    </div>
+                    <div className="w-16 h-16 bg-white rounded-[1.5rem] flex items-center justify-center text-emerald-600 shadow-xl group-hover:rotate-6 transition-all"><Landmark size={32}/></div>
+                  </div>
+                  <div className="p-8 bg-slate-900 rounded-[2rem] text-white flex items-center justify-between group">
+                    <div>
+                      <div className="flex items-center gap-2 text-slate-400 mb-2">
+                        <Target size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Available Budget</span>
+                      </div>
+                      <p className="text-3xl font-black text-white">
+                        ${Math.max(0, profile.personalPaymentGoal - totalExecuted).toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="w-16 h-16 bg-white/10 rounded-[1.5rem] flex items-center justify-center text-indigo-400 group-hover:scale-110 transition-all"><Target size={32}/></div>
+                  </div>
+                </div>
+
+                {/* Optimized Excel-style Ledger for personal payments */}
+                <div className="mt-10 overflow-hidden rounded-[2.5rem] border-4 border-slate-50 shadow-inner">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-100/80 text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                      <tr>
+                        <th className="px-8 py-5 border-r border-slate-200">Transaction ID</th>
+                        <th className="px-8 py-5 border-r border-slate-200">Concept</th>
+                        <th className="px-8 py-5 border-r border-slate-200">Class</th>
+                        <th className="px-8 py-5 border-r border-slate-200">Log Date</th>
+                        <th className="px-8 py-5 text-right">Debit ($)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-xs font-bold text-slate-700 bg-white">
+                      {payments.length > 0 ? payments.map((p) => (
+                        <tr key={p.id} className="hover:bg-indigo-50/30 transition-all">
+                          <td className="px-8 py-5 border-r border-slate-50 text-[9px] font-mono text-slate-300 uppercase">{p.id}</td>
+                          <td className="px-8 py-5 border-r border-slate-50 text-slate-900 font-black">{p.concept}</td>
+                          <td className="px-8 py-5 border-r border-slate-50">
+                            <span className="bg-white border-2 border-slate-100 text-slate-500 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter">{p.category}</span>
+                          </td>
+                          <td className="px-8 py-5 border-r border-slate-50 text-slate-400 font-bold uppercase">{p.date}</td>
+                          <td className="px-8 py-5 text-right font-black text-slate-900 text-sm">-${p.amount.toLocaleString()}</td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan={5} className="px-8 py-32 text-center text-slate-300 italic">
+                             <CreditCard size={48} className="mx-auto mb-6 opacity-10" />
+                             <p className="text-[10px] font-black uppercase tracking-widest">Zero historical transactions recorded</p>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

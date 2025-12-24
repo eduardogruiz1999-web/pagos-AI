@@ -1,5 +1,18 @@
 
 export type LotStatus = 'disponible' | 'vendido' | 'reservado';
+export type PaymentMethod = 'transferencia' | 'efectivo' | 'cheque' | 'credito';
+
+export interface LotBoundaryPoint {
+  x: number;
+  y: number;
+}
+
+export interface LotHistoryEvent {
+  id: string;
+  timestamp: string;
+  action: 'CREACION' | 'CAMBIO_ESTADO' | 'CAMBIO_PRECIO' | 'ASIGNACION_CLIENTE' | 'ELIMINACION_AREA';
+  description: string;
+}
 
 export interface Lot {
   id: string;
@@ -8,6 +21,9 @@ export interface Lot {
   status: LotStatus;
   x: number;
   y: number;
+  boundary?: LotBoundaryPoint[]; // Puntos del polígono que delimita el lote
+  clientId?: string;
+  history?: LotHistoryEvent[];
 }
 
 export interface ClientFile {
@@ -32,6 +48,10 @@ export interface Client {
   phone: string;
   division: string;
   lotId: string;
+  registrationDate: string;
+  totalAmount: number;
+  downPayment: number;
+  paymentMethod: PaymentMethod;
   payments: PaymentSchedule[];
   files: ClientFile[];
 }
