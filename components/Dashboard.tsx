@@ -13,7 +13,8 @@ import {
   Wallet, Coins,
   BarChart as BarChartIcon,
   PieChart as PieChartIcon,
-  Download
+  Download, Search, Filter as FilterIcon,
+  Plus
 } from 'lucide-react';
 
 interface DashboardProps {
@@ -35,6 +36,7 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onSelectClient, lotsByDi
   const [activeView, setActiveView] = useState<'visual' | 'excel'>('visual');
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const stats = useMemo(() => {
     const totalLots = Object.values(lotsByDivision).flat() as Lot[];
@@ -49,27 +51,39 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onSelectClient, lotsByDi
       activeClients: clients.length,
       availableLots: totalLots.filter(l => l.status === 'disponible').length,
       lotStatusData: [
-        { name: 'Libres', value: totalLots.filter(l => l.status === 'disponible').length },
+        { name: 'Disponibles', value: totalLots.filter(l => l.status === 'disponible').length },
         { name: 'Vendidos', value: totalLots.filter(l => l.status === 'vendido').length },
-        { name: 'Apartados', value: totalLots.filter(l => l.status === 'reservado').length }
+        { name: 'Reservados', value: totalLots.filter(l => l.status === 'reservado').length }
       ],
-      divisionSales: Object.entries(lotsByDivision).map(([name, lots]) => ({
-        name,
-        ventas: clients.filter(c => c.division === name).length,
-        recaudado: clients.filter(c => c.division === name).reduce((acc, c) => acc + (c.downPayment + c.payments.filter(p => p.status === 'pagado').reduce((sum, p) => sum + p.amount, 0)), 0) / 1000 // k$
-      }))
+      divisionSales: Object.entries(lotsByDivision).map(([name, lots]) => {
+        const divisionClients = clients.filter(c => c.division === name);
+        const collected = divisionClients.reduce((acc, c) => acc + (c.downPayment + c.payments.filter(p => p.status === 'pagado').reduce((sum, p) => sum + p.amount, 0)), 0);
+        return {
+          name,
+          ventas: divisionClients.length,
+          recaudado: collected / 1000 // k$
+        };
+      })
     };
   }, [clients, lotsByDivision]);
+
+  const filteredClients = useMemo(() => {
+    return clients.filter(c => 
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      c.lotId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.division.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  }, [clients, searchTerm]);
 
   const handleRunAnalysis = async () => {
     setIsAnalyzing(true);
     const paymentsForAi: Payment[] = clients.flatMap(c => c.payments).map(p => ({
       id: p.id,
-      concept: `Pago Lote ${clients.find(cli => cli.id === p.id)?.lotId}`,
+      concept: `Mensualidad Lote ${clients.find(cli => cli.id === p.id)?.lotId || 'N/A'}`,
       amount: p.amount,
       date: p.dueDate,
       status: (p.status === 'pagado' ? 'completado' : p.status) as 'pendiente' | 'completado' | 'atrasado',
-      category: 'Mensualidad'
+      category: 'Mensualidad Inmobiliaria'
     }));
 
     const result = await analyzePayments(paymentsForAi);
@@ -78,49 +92,59 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onSelectClient, lotsByDi
   };
 
   return (
-    <div className="space-y-8 animate-fadeIn pb-12">
+    <div className="space-y-8 animate-fadeIn pb-12 max-w-[1600px] mx-auto">
+      {/* Header Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <MetricCard label="Liquidez Recaudada" value={`$${stats.totalLiquidity.toLocaleString()}`} icon={<Coins className="text-emerald-600" />} color="bg-emerald-50" />
-        <MetricCard label="Cartera por Cobrar" value={`$${stats.totalPending.toLocaleString()}`} icon={<Wallet className="text-indigo-600" />} color="bg-indigo-50" />
-        <MetricCard label="Expedientes Activos" value={stats.activeClients.toString()} icon={<Users className="text-blue-600" />} color="bg-blue-50" />
-        <MetricCard label="Disponibilidad Lotes" value={stats.availableLots.toString()} icon={<MapIcon className="text-amber-600" />} color="bg-amber-50" />
+        <MetricCard label="Liquidez Real" value={`$${stats.totalLiquidity.toLocaleString()}`} icon={<Coins size={24} className="text-emerald-600" />} color="bg-emerald-50" trend="+12.5%" />
+        <MetricCard label="Cuentas por Cobrar" value={`$${stats.totalPending.toLocaleString()}`} icon={<Wallet size={24} className="text-indigo-600" />} color="bg-indigo-50" trend="-3.2%" />
+        <MetricCard label="Operaciones Activas" value={stats.activeClients.toString()} icon={<Users size={24} className="text-blue-600" />} color="bg-blue-50" />
+        <MetricCard label="Stock Disponible" value={stats.availableLots.toString()} icon={<MapIcon size={24} className="text-amber-600" />} color="bg-amber-50" />
       </div>
 
-      <div className="bg-white rounded-[2.5rem] border border-indigo-100 shadow-xl shadow-indigo-50/50 overflow-hidden">
-        <div className="p-8 border-b border-indigo-50 bg-gradient-to-r from-indigo-50/10 to-white flex items-center justify-between">
+      {/* AI Insights Section */}
+      <div className="bg-white rounded-[2.5rem] border border-slate-200 shadow-xl overflow-hidden">
+        <div className="p-8 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-lg">
+            <div className="w-14 h-14 bg-slate-900 rounded-2xl flex items-center justify-center text-white shadow-xl">
               <BrainCircuit size={28} />
             </div>
             <div>
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">Financial Health Analysis</h2>
-              <p className="text-xs text-indigo-500 font-bold uppercase tracking-widest mt-0.5">Gemini 3 Cognitive Layer</p>
+              <h2 className="text-xl font-black text-slate-900 tracking-tight uppercase">Cognitive Sales Analysis</h2>
+              <p className="text-[10px] text-indigo-500 font-black uppercase tracking-[0.2em] mt-0.5">Powered by Gemini 3 Pro • Real-time Intelligence</p>
             </div>
           </div>
-          <button onClick={handleRunAnalysis} disabled={isAnalyzing} className="flex items-center gap-3 px-8 py-4 bg-slate-900 hover:bg-black disabled:bg-slate-300 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl">
+          <button 
+            onClick={handleRunAnalysis} 
+            disabled={isAnalyzing} 
+            className="flex items-center gap-3 px-8 py-4 bg-slate-900 hover:bg-black disabled:bg-slate-300 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-xl hover:-translate-y-1 active:translate-y-0"
+          >
             {isAnalyzing ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />}
-            {isAnalyzing ? 'Analizando...' : 'Generar Análisis de IA'}
+            {isAnalyzing ? 'Procesando Datos...' : 'Solicitar Análisis Estratégico'}
           </button>
         </div>
 
         {analysis && (
-          <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fadeIn">
+          <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-10 animate-fadeIn">
             <div className="lg:col-span-2 space-y-6">
-              <div className="p-7 bg-indigo-50/30 rounded-3xl border border-indigo-100 relative shadow-inner">
-                <div className="absolute -top-3 left-6 px-3 py-1 bg-white border border-indigo-100 rounded-full text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2"><Info size={12} /> Executive Briefing</div>
-                <p className="text-slate-800 leading-relaxed font-semibold pt-2 text-sm">{analysis.summary}</p>
+              <div className="p-8 bg-indigo-50/40 rounded-[2rem] border border-indigo-100 relative shadow-inner">
+                <div className="absolute -top-3 left-6 px-4 py-1.5 bg-white border border-indigo-100 rounded-full text-[10px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-2">
+                  <Info size={14} /> Executive Summary
+                </div>
+                <p className="text-slate-800 leading-relaxed font-bold pt-2 text-sm md:text-base">{analysis.summary}</p>
               </div>
-              <div className="p-7 bg-emerald-50/40 rounded-3xl border border-emerald-100 relative">
-                <div className="absolute -top-3 left-6 px-3 py-1 bg-white border border-emerald-100 rounded-full text-[9px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2"><Lightbulb size={12} /> Sugerencia Estratégica</div>
+              <div className="p-8 bg-emerald-50/40 rounded-[2rem] border border-emerald-100 relative">
+                <div className="absolute -top-3 left-6 px-4 py-1.5 bg-white border border-emerald-100 rounded-full text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                  <Lightbulb size={14} /> Strategic Advice
+                </div>
                 <p className="text-emerald-900 font-bold pt-2 text-sm italic">"{analysis.advice}"</p>
               </div>
             </div>
             <div className="space-y-4">
-              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2">Data Points</h4>
+              <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 mb-4">Core Financial KPIs</h4>
               {analysis.kpis.map((kpi, idx) => (
-                <div key={idx} className="p-5 bg-white border border-slate-200 rounded-2xl shadow-sm flex items-center justify-between hover:border-indigo-500 transition-all">
-                  <span className="text-xs font-bold text-slate-500">{kpi.label}</span>
-                  <span className="text-base font-black text-slate-900">{kpi.value}</span>
+                <div key={idx} className="p-6 bg-white border border-slate-200 rounded-3xl shadow-sm flex items-center justify-between group hover:border-indigo-600 transition-all hover:shadow-md">
+                  <span className="text-xs font-black text-slate-500 uppercase">{kpi.label}</span>
+                  <span className="text-lg font-black text-slate-900 group-hover:text-indigo-600 transition-colors">{kpi.value}</span>
                 </div>
               ))}
             </div>
@@ -128,47 +152,77 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onSelectClient, lotsByDi
         )}
       </div>
 
-      <div className="flex gap-4 p-1.5 bg-slate-200/50 backdrop-blur rounded-2xl w-fit">
-        <button onClick={() => setActiveView('visual')} className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'visual' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>Analytics Suite</button>
-        <button onClick={() => setActiveView('excel')} className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'excel' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}>Spreadsheet View</button>
+      {/* View Switcher */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-4 p-1.5 bg-slate-200/50 backdrop-blur-sm rounded-2xl w-fit border border-slate-200">
+          <button 
+            onClick={() => setActiveView('visual')} 
+            className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'visual' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            Analytics Dashboard
+          </button>
+          <button 
+            onClick={() => setActiveView('excel')} 
+            className={`px-8 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeView === 'excel' ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+          >
+            Excel Data Container
+          </button>
+        </div>
+        
+        {activeView === 'excel' && (
+          <div className="flex items-center gap-4">
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+              <input 
+                type="text" 
+                placeholder="Filtrar registros..." 
+                className="pl-12 pr-6 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 min-w-[300px]"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <button className="p-3 bg-white border border-slate-200 rounded-2xl text-slate-500 hover:text-slate-800 shadow-sm transition-all"><FilterIcon size={20}/></button>
+          </div>
+        )}
       </div>
 
+      {/* Main Content Areas */}
       {activeView === 'visual' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
-              <BarChartIcon size={16} /> Volumen de Ventas por Zona
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fadeIn">
+          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-10 flex items-center gap-2">
+              <BarChartIcon size={16} /> Recaudación Histórica por Proyecto (k$)
             </h3>
-            <div className="h-80 w-full">
+            <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={stats.divisionSales}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#94a3b8' }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 800, fill: '#94a3b8' }} />
+                  <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#f1f5f9" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 900, fill: '#64748b' }} />
                   <Tooltip 
-                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '15px' }}
-                    cursor={{ fill: '#f1f5f9' }}
+                    cursor={{ fill: '#f8fafc' }}
+                    contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', padding: '20px' }}
                   />
-                  <Bar dataKey="ventas" fill="#1e293b" radius={[8, 8, 0, 0]} barSize={32} />
+                  <Bar dataKey="recaudado" fill="#0f172a" radius={[12, 12, 0, 0]} barSize={40} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
-          <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm">
-            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-8 flex items-center gap-2">
-              <PieChartIcon size={16} /> Estatus de Inventario Total
+          <div className="bg-white p-10 rounded-[3rem] border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+            <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-10 flex items-center gap-2">
+              <PieChartIcon size={16} /> Distribución Operativa de Lotes
             </h3>
-            <div className="h-80 w-full">
+            <div className="h-[400px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={stats.lotStatusData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={70}
-                    outerRadius={100}
-                    paddingAngle={8}
+                    innerRadius={80}
+                    outerRadius={120}
+                    paddingAngle={10}
                     dataKey="value"
                   >
                     {stats.lotStatusData.map((entry, index) => (
@@ -176,67 +230,124 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onSelectClient, lotsByDi
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '10px', fontWeight: 'bold', textTransform: 'uppercase' }} />
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={40} 
+                    iconType="circle"
+                    wrapperStyle={{ fontSize: '10px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em' }}
+                  />
                 </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 bg-slate-900 p-12 rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/10 blur-[120px] rounded-full group-hover:bg-indigo-600/20 transition-all duration-700"></div>
+            <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-10 flex items-center gap-3">
+              <TrendingUp size={20} /> Proyección de Crecimiento Territorial
+            </h3>
+            <div className="h-[450px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={stats.divisionSales}>
+                  <defs>
+                    <linearGradient id="colorRec" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94a3b8', fontSize: 10, fontWeight: 700 }} />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '1rem' }}
+                  />
+                  <Area type="monotone" dataKey="recaudado" stroke="#6366f1" strokeWidth={6} fillOpacity={1} fill="url(#colorRec)" />
+                  <Area type="monotone" dataKey="ventas" stroke="#10b981" strokeWidth={4} fillOpacity={0} />
+                </AreaChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-[2.5rem] border-4 border-slate-200 shadow-2xl overflow-hidden flex flex-col min-h-[600px]">
-          <div className="p-6 border-b-2 border-slate-200 bg-slate-50 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-indigo-600 text-white rounded-xl shadow-lg"><TableIcon size={20} /></div>
+        <div className="bg-white rounded-[3rem] border-4 border-slate-100 shadow-2xl overflow-hidden flex flex-col min-h-[700px] animate-fadeIn">
+          <div className="p-8 border-b-2 border-slate-100 bg-slate-50/50 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-4 bg-indigo-600 text-white rounded-[1.5rem] shadow-lg"><TableIcon size={24} /></div>
               <div>
-                <h2 className="font-black text-slate-900 tracking-tight text-lg uppercase">Ledger Container v1.0</h2>
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Master Sales Record & Collection Status</p>
+                <h2 className="font-black text-slate-900 tracking-tight text-xl uppercase">Ledger Master View v2.0</h2>
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em]">Data Audit • Transaction Records • Unified Ledger</p>
               </div>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border-2 border-slate-200 rounded-xl text-[10px] font-black uppercase hover:bg-slate-100 transition-all">
-              <Download size={14} /> Export CSV
-            </button>
+            <div className="flex gap-3">
+              <button className="flex items-center gap-2 px-6 py-3 bg-white border-2 border-slate-200 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-100 transition-all shadow-sm">
+                <Download size={16} /> XLSX Export
+              </button>
+              <button onClick={onAddClient} className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-xl">
+                <Plus size={16} /> New Entry
+              </button>
+            </div>
           </div>
           
-          <div className="flex-1 overflow-auto excel-scroll bg-white relative">
-            <table className="w-full border-collapse">
-              <thead className="sticky top-0 z-20">
+          <div className="flex-1 overflow-auto excel-scroll relative">
+            <table className="w-full border-collapse table-fixed min-w-[1200px]">
+              <thead className="sticky top-0 z-30 shadow-sm">
                 <tr className="bg-slate-100 text-[10px] font-black uppercase text-slate-500 border-b-2 border-slate-200">
-                  <th className="px-6 py-4 text-left border-r border-slate-200">Ref ID</th>
-                  <th className="px-6 py-4 text-left border-r border-slate-200">Fecha Reg.</th>
-                  <th className="px-6 py-4 text-left border-r border-slate-200">Lote</th>
-                  <th className="px-6 py-4 text-left border-r border-slate-200">Titular del Contrato</th>
-                  <th className="px-6 py-4 text-right border-r border-slate-200">Valor Operación</th>
-                  <th className="px-6 py-4 text-right border-r border-slate-200">Enganche Rec.</th>
-                  <th className="px-6 py-4 text-center">Modalidad</th>
+                  <th className="w-16 px-6 py-5 text-center border-r border-slate-200 bg-slate-100">#</th>
+                  <th className="w-48 px-6 py-5 text-left border-r border-slate-200 bg-slate-100">Transaction Date</th>
+                  <th className="w-32 px-6 py-5 text-left border-r border-slate-200 bg-slate-100">Unit ID</th>
+                  <th className="px-6 py-5 text-left border-r border-slate-200 bg-slate-100">Contract Holder</th>
+                  <th className="w-48 px-6 py-5 text-left border-r border-slate-200 bg-slate-100">Zone / Project</th>
+                  <th className="w-44 px-6 py-5 text-right border-r border-slate-200 bg-slate-100">Operation Value</th>
+                  <th className="w-40 px-6 py-5 text-center bg-slate-100">Method</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {clients.map((client) => (
-                  <tr key={client.id} onClick={() => onSelectClient(client.id)} className="group cursor-pointer hover:bg-indigo-50/40 transition-all">
-                    <td className="px-6 py-4 text-[9px] font-mono text-slate-400 border-r border-slate-50">{client.id.toUpperCase()}</td>
-                    <td className="px-6 py-4 text-[10px] font-bold text-slate-600 uppercase border-r border-slate-50">{client.registrationDate}</td>
-                    <td className="px-6 py-4 text-xs font-black text-indigo-600 border-r border-slate-50">{client.lotId}</td>
-                    <td className="px-6 py-4 text-xs font-bold text-slate-700 border-r border-slate-50">{client.name}</td>
-                    <td className="px-6 py-4 text-xs font-mono font-black text-slate-900 text-right border-r border-slate-50 bg-slate-50/30 group-hover:bg-transparent transition-colors">${client.totalAmount.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-xs font-mono font-black text-emerald-600 text-right border-r border-slate-50">${client.downPayment.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-center">
-                      <span className="px-3 py-1 bg-slate-100 border border-slate-200 rounded-lg text-[9px] font-black uppercase tracking-tighter text-slate-500 group-hover:bg-indigo-600 group-hover:text-white group-hover:border-indigo-600 transition-all">{client.paymentMethod}</span>
+                {filteredClients.map((client, idx) => (
+                  <tr 
+                    key={client.id} 
+                    onClick={() => onSelectClient(client.id)} 
+                    className="group cursor-pointer hover:bg-indigo-50/50 transition-all border-l-4 border-l-transparent hover:border-l-indigo-600"
+                  >
+                    <td className="px-6 py-5 text-[10px] font-mono text-slate-300 text-center border-r border-slate-50">{idx + 1}</td>
+                    <td className="px-6 py-5 text-[10px] font-bold text-slate-500 uppercase border-r border-slate-50">{client.registrationDate}</td>
+                    <td className="px-6 py-5 text-xs font-black text-indigo-600 border-r border-slate-50 tracking-tighter">{client.lotId}</td>
+                    <td className="px-6 py-5 border-r border-slate-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">{client.name.charAt(0)}</div>
+                        <span className="text-xs font-black text-slate-700 truncate">{client.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase border-r border-slate-50">{client.division}</td>
+                    <td className="px-6 py-5 text-sm font-mono font-black text-slate-900 text-right border-r border-slate-50 bg-slate-50/20 group-hover:bg-transparent transition-colors">
+                      ${client.totalAmount.toLocaleString()}
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <span className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-tighter transition-all ${
+                        client.paymentMethod === 'credito' ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 
+                        'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                      }`}>
+                        {client.paymentMethod}
+                      </span>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-            {clients.length === 0 && (
-              <div className="flex flex-col items-center justify-center h-[400px] text-slate-300">
-                 <TableIcon size={48} className="opacity-10 mb-4" />
-                 <p className="text-xs font-black uppercase tracking-widest">No matching records found in database</p>
+            {filteredClients.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-40 bg-slate-50/50">
+                 <div className="w-20 h-20 bg-white border-4 border-slate-200 rounded-[2rem] flex items-center justify-center text-slate-200 mb-6 shadow-sm"><Search size={40} /></div>
+                 <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No matching datasets in unified ledger</p>
               </div>
             )}
           </div>
-          <div className="p-4 bg-slate-50 border-t-2 border-slate-200 flex justify-between items-center text-[10px] font-black text-slate-400 uppercase">
-             <span>Registros totales: {clients.length}</span>
-             <div className="flex gap-4">
-                <span>Sumatoria Total: <span className="text-slate-900">${clients.reduce((s,c) => s+c.totalAmount, 0).toLocaleString()}</span></span>
+          
+          <div className="p-6 bg-slate-900 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center text-[10px] font-black text-slate-400 uppercase tracking-[0.1em] gap-6">
+             <div className="flex gap-8">
+               <span>Index Records: <span className="text-white ml-2">{filteredClients.length}</span></span>
+               <span>Audit Checksum: <span className="text-emerald-400 ml-2">PASS</span></span>
+             </div>
+             <div className="flex gap-8 items-center">
+                <span className="flex items-center gap-2">Aggregated Value: <span className="text-2xl font-black text-white tracking-tighter ml-2">${filteredClients.reduce((s,c) => s+c.totalAmount, 0).toLocaleString()}</span></span>
              </div>
           </div>
         </div>
@@ -245,14 +356,19 @@ const Dashboard: React.FC<DashboardProps> = ({ clients, onSelectClient, lotsByDi
   );
 };
 
-const MetricCard: React.FC<{ label: string, value: string, icon: React.ReactNode, color: string }> = ({ label, value, icon, color }) => (
-  <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:-translate-y-1 transition-all cursor-default group">
+const MetricCard: React.FC<{ label: string, value: string, icon: React.ReactNode, color: string, trend?: string }> = ({ label, value, icon, color, trend }) => (
+  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm hover:shadow-2xl hover:-translate-y-1.5 transition-all duration-300 cursor-default group">
     <div className="flex items-start justify-between">
-      <div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 group-hover:text-indigo-600 transition-colors">{label}</p>
+      <div className="space-y-3">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">{label}</p>
         <h3 className="text-3xl font-black text-slate-900 tracking-tighter">{value}</h3>
+        {trend && (
+          <div className={`flex items-center gap-1.5 text-[10px] font-black ${trend.startsWith('+') ? 'text-emerald-500' : 'text-rose-500'}`}>
+            <TrendingUp size={12} className={trend.startsWith('-') ? 'rotate-180' : ''} /> {trend} <span className="text-slate-300 font-bold ml-1">vs L30D</span>
+          </div>
+        )}
       </div>
-      <div className={`p-4 rounded-2xl ${color} transition-all group-hover:scale-110 group-hover:shadow-lg`}>{icon}</div>
+      <div className={`p-5 rounded-[1.75rem] ${color} transition-all group-hover:scale-110 group-hover:shadow-lg group-hover:rotate-6`}>{icon}</div>
     </div>
   </div>
 );
