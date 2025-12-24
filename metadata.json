@@ -1,0 +1,7 @@
+{
+  "name": "registro AI",
+  "description": "Una aplicación avanzada para el registro de pagos, gestión de perfiles con carga de documentos y un tablero interactivo tipo Excel con inteligencia artificial de Gemini para análisis financiero.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
